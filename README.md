@@ -1,6 +1,22 @@
-# GPT-Style Language Model from Scratch 
+# GPT-Style LLM from Scratch
 
-This project implements a **decoder-only GPT-style Transformer** from scratch using PyTorch. The model is trained on the **TinyStories dataset** to generate coherent short stories using character-level tokenization.
+> A decoder-only Transformer (≈4.8M parameters) written from scratch in PyTorch, with no pre-trained weights or tokenizers, trained on TinyStories to generate short stories character by character.
+
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
+![Transformers](https://img.shields.io/badge/Architecture-Decoder--only%20Transformer-0A66C2)
+
+## Highlights
+
+- **Every component written by hand:** token and positional embeddings, causal multi-head self-attention (8 heads), GELU feed-forward blocks, pre-norm residuals and an LM head. 6 layers, d_model 256, context length 128.
+- **Training recipe:** AdamW with weight decay, linear warmup + cosine LR decay (3e-3 → 3e-4), gradient clipping, and 20 epochs on 100K stories.
+- **Results:** final validation loss **0.644** (≈ **1.90** per-character perplexity), with a train/validation gap of only 0.04.
+- **Sampling analysis:** generations at temperature 0, 0.8 and 1.2, with documented failure modes (repetition, coherence drift, hallucination).
+
+<p>
+  <img src="Architecture.png" alt="Model architecture" width="48%">
+  <img src="output_files/loss_curves.png" alt="Training and validation loss" width="48%">
+</p>
 
 ---
 
@@ -148,30 +164,28 @@ She tried to pull it out, but it was too hard...
 
 ---
 
-##  Project Structure
+## Project Structure
 
-GPT-LLM/
-│
-├── data/
-├── checkpoints
-├── code_file.ipynb
-├── model.pth
-├──tinygpt_checkpoint.pt
-└── README.md
-
+```
+GPT-Style-LLM-from-Scratch/
+├── Code_file.ipynb          # data prep, model, training loop, generation
+├── Architecture.png         # model diagram
+├── output_files/
+│   └── loss_curves.png      # train / validation loss
+├── model.pth                # trained weights
+└── tinygpt_checkpoint.pt    # full training checkpoint
+```
 
 ---
 
-##  How to Run
+## How to Run
 
-### 1. Install Dependencies
-pip install torch numpy matplotlib
+```bash
+pip install torch numpy matplotlib datasets jupyter
+jupyter notebook Code_file.ipynb
+```
 
-### 2. Train Model
-python train.py
-
-### 3. Generate Text
-python generate.py
+Run the cells in order: load TinyStories → build the character vocabulary → train → generate. To skip training, load `model.pth` and run only the generation cells.
 
 ---
 
