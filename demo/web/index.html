@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPT from Scratch · Live Demo</title>
+<meta name="description" content="A 4.8M-parameter GPT written from scratch in PyTorch, running in your browser with ONNX Runtime Web.">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1f; --muted: #5f6368; --line: #e3e3df;
+    --accent: #3b5bdb; --accent-ink: #ffffff; --out: #fbfbfa; --prompt: #3b5bdb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111214; --card: #1a1b1e; --ink: #ececec; --muted: #a0a4ab; --line: #2c2e33;
+            --accent: #7c93ff; --accent-ink: #0d0f14; --out: #141518; --prompt: #9fb0ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; padding: 0; list-style: none; }
+  .stats li { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 12px;
+              font-size: .85rem; color: var(--muted); }
+  .stats b { color: var(--ink); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 0 0 6px; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; color: var(--ink); background: var(--out);
+             border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin: 18px 0; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  input[type=number] { width: 100%; font: inherit; color: var(--ink); background: var(--out);
+                       border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .val { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 18px; cursor: pointer;
+           background: var(--accent); color: var(--accent-ink); }
+  button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent;
+          color: var(--muted); font-weight: 500; }
+  #out { margin-top: 18px; min-height: 180px; white-space: pre-wrap; background: var(--out); border: 1px solid var(--line);
+         border-radius: 10px; padding: 14px; font: 15px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+  #out .p { color: var(--prompt); font-weight: 600; }
+  #status { color: var(--muted); font-size: .85rem; }
+  footer { margin-top: 28px; color: var(--muted); font-size: .9rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>GPT from Scratch</h1>
+  <p class="lede">A decoder-only Transformer written from scratch in PyTorch and trained on TinyStories, running
+    <b>entirely in your browser</b> with ONNX Runtime Web. Nothing is sent to a server.</p>
+  <ul class="stats">
+    <li><b id="params">4.8M</b> parameters</li>
+    <li><b>6</b> layers · <b>8</b> heads · d<sub>model</sub> <b>256</b></li>
+    <li>character-level · context <b id="ctx">128</b></li>
+    <li>validation loss <b>0.644</b></li>
+  </ul>
+
+  <section class="card" aria-label="Text generation">
+    <label for="prompt">Prompt</label>
+    <textarea id="prompt">Once upon a time, a little dog named</textarea>
+    <div class="chips">
+      <button class="chip" data-p="Once upon a time">Once upon a time</button>
+      <button class="chip" data-p="Lily found a shiny red ball">Lily found a shiny red ball</button>
+      <button class="chip" data-p="The little bear was sad because">The little bear was sad because</button>
+    </div>
+    <div class="controls">
+      <div><label for="len">Characters <span class="val" id="lenv">300</span></label>
+        <input id="len" type="range" min="50" max="600" step="10" value="300"></div>
+      <div><label for="temp">Temperature <span class="val" id="tempv">0.80</span></label>
+        <input id="temp" type="range" min="0" max="1.5" step="0.05" value="0.8"></div>
+      <div><label for="topk">Top-k (0 = off) <span class="val" id="topkv">0</span></label>
+        <input id="topk" type="range" min="0" max="60" step="1" value="0"></div>
+      <div><label for="seed">Seed</label><input id="seed" type="number" value="42"></div>
+    </div>
+    <div class="row">
+      <button id="go" disabled>Loading model…</button>
+      <button id="stop" class="secondary" disabled>Stop</button>
+      <span id="status" role="status"></span>
+    </div>
+    <div id="out" aria-live="polite"></div>
+  </section>
+
+  <footer>
+    Temperature 0 is greedy decoding; higher values add variety. The model only knows the ~110 characters it was
+    trained on, so other characters in the prompt are dropped.<br>
+    <a href="https://github.com/IamSavitha/GPT-Style-LLM-from-Scratch">Source code and training notebook</a> ·
+    <a href="https://iamsavitha.github.io/">Savitha Vijayarangan</a>
+  </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let session, itos, stoi, blockSize, stopFlag = false;
+
+for (const [r, v, fmt] of [["len", "lenv", (x) => x], ["temp", "tempv", (x) => (+x).toFixed(2)], ["topk", "topkv", (x) => x]]) {
+  $(r).addEventListener("input", () => ($(v).textContent = fmt($(r).value)));
+}
+document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => ($("prompt").value = c.dataset.p)));
+
+function mulberry32(a) {
+  return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+function sample(logits, temperature, topK, rand) {
+  if (temperature <= 1e-8) { let best = 0; for (let i = 1; i < logits.length; i++) if (logits[i] > logits[best]) best = i; return best; }
+  let idx = Array.from(logits.keys());
+  if (topK > 0) idx = idx.sort((a, b) => logits[b] - logits[a]).slice(0, topK);
+  const max = Math.max(...idx.map((i) => logits[i]));
+  const w = idx.map((i) => Math.exp((logits[i] - max) / temperature));
+  const sum = w.reduce((a, b) => a + b, 0);
+  let r = rand() * sum;
+  for (let j = 0; j < idx.length; j++) { r -= w[j]; if (r <= 0) return idx[j]; }
+  return idx[idx.length - 1];
+}
+
+async function init() {
+  try {
+    const meta = await (await fetch("vocab.json")).json();
+    itos = meta.itos; blockSize = meta.block_size;
+    stoi = new Map(itos.map((c, i) => [c, i]));
+    $("params").textContent = (meta.params / 1e6).toFixed(1) + "M";
+    $("ctx").textContent = blockSize;
+    ort.env.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency || 1);
+    session = await ort.InferenceSession.create("model.onnx", { executionProviders: ["wasm"] });
+    $("go").disabled = false; $("go").textContent = "Generate";
+  } catch (e) {
+    $("go").textContent = "Model failed to load"; $("status").textContent = e.message;
+  }
+}
+
+async function generate() {
+  const prompt = [...$("prompt").value].filter((c) => stoi.has(c)).join("") || "Once upon a time";
+  const n = +$("len").value, temperature = +$("temp").value, topK = +$("topk").value;
+  const rand = mulberry32(+$("seed").value || 0);
+  const ids = [...prompt].map((c) => stoi.get(c));
+  const out = $("out"); out.innerHTML = "";
+  const p = document.createElement("span"); p.className = "p"; p.textContent = prompt; out.appendChild(p);
+  const gen = document.createTextNode(""); out.appendChild(gen);
+  $("go").disabled = true; $("stop").disabled = false; stopFlag = false;
+  const t0 = performance.now();
+  for (let step = 0; step < n && !stopFlag; step++) {
+    const ctx = ids.slice(-blockSize);
+    const input = new ort.Tensor("int64", BigInt64Array.from(ctx.map(BigInt)), [1, ctx.length]);
+    const { logits } = await session.run({ input_ids: input });
+    const V = logits.dims[2], last = logits.data.subarray((ctx.length - 1) * V, ctx.length * V);
+    const next = sample(last, temperature, topK, rand);
+    ids.push(next); gen.appendData(itos[next]);
+    if (step % 8 === 0) {
+      $("status").textContent = `${step + 1} chars · ${((step + 1) / ((performance.now() - t0) / 1000)).toFixed(0)} chars/s`;
+      await new Promise(requestAnimationFrame);
+    }
+  }
+  const secs = (performance.now() - t0) / 1000;
+  $("status").textContent = `${gen.length} chars in ${secs.toFixed(1)} s (${(gen.length / secs).toFixed(0)} chars/s, on your device)`;
+  $("go").disabled = false; $("stop").disabled = true;
+}
+
+$("go").addEventListener("click", generate);
+$("stop").addEventListener("click", () => (stopFlag = true));
+init();
+</script>
+</body>
+</html>
