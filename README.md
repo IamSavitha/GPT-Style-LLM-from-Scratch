@@ -6,6 +6,8 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
 ![Transformers](https://img.shields.io/badge/Architecture-Decoder--only%20Transformer-0A66C2)
 
+**▶ [Live demo](https://iamsavitha.github.io/GPT-Style-LLM-from-Scratch/)**: generate stories with the trained model, running entirely in your browser (ONNX Runtime Web, exported by GitHub Actions).
+
 ## Highlights
 
 - **Every component written by hand:** token and positional embeddings, causal multi-head self-attention (8 heads), GELU feed-forward blocks, pre-norm residuals and an LM head. 6 layers, d_model 256, context length 128.
@@ -186,6 +188,8 @@ jupyter notebook Code_file.ipynb
 ```
 
 Run the cells in order: load TinyStories → build the character vocabulary → train → generate. To skip training, load `model.pth` and run only the generation cells.
+
+Local web UI: `pip install -r demo/requirements.txt && python demo/app.py` (Gradio). The browser demo is built by `demo/export_onnx.py` + `.github/workflows/pages.yml`.
 
 ---
 
